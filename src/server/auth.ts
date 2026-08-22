@@ -1,3 +1,4 @@
+import { cache } from 'react'
 import { cookies } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import { SignJWT, jwtVerify } from 'jose'
@@ -73,10 +74,10 @@ export async function clearSessionCookie() {
 }
 
 /**
- * The "authoritative half": does this user still exist, are they still active. This is what
- * makes a suspended account lose access before its 7-day JWT expires.
+ * The "authoritative half": does this user still exist, are they still active. Memoized with React `cache`
+ * so layout, page, and subcomponents share a single DB fetch per render.
  */
-export async function getSession(): Promise<Session | null> {
+export const getSession = cache(async (): Promise<Session | null> => {
   const store = await cookies()
   const token = store.get(SESSION_COOKIE)?.value
   if (!token) return null
@@ -101,7 +102,7 @@ export async function getSession(): Promise<Session | null> {
 
   const { isActive: _isActive, ...session } = user
   return session
-}
+})
 
 /**
  * Where a signed-in user belongs after landing on `/`. Middleware runs at the edge and

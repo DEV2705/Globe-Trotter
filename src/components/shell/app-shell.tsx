@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
 import { TopBar, type TopBarUser } from './top-bar'
+import { ChatBubble } from '@/components/ai/chat-bubble'
+import { isAiConfigured } from '@/server/ai/client'
 
 export function AppShell({ user, children }: { user: TopBarUser; children: ReactNode }) {
   return (
@@ -9,6 +11,7 @@ export function AppShell({ user, children }: { user: TopBarUser; children: React
       <footer className="no-print border-t border-[var(--rule)] px-4 py-6 text-center text-xs text-[var(--muted)]">
         GlobeTrotter — plan the whole trip, not just the flight.
       </footer>
+      <ChatBubble enabled={isAiConfigured()} />
     </div>
   )
 }
