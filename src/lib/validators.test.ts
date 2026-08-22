@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { type ZodTypeAny } from 'zod'
+import { type ZodTypeAny, type z } from 'zod'
 import {
   loginSchema,
   registerSchema,
@@ -24,20 +24,18 @@ import {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /** Assert a Zod parse succeeds and return the parsed (output) value. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ok(schema: ZodTypeAny, input: unknown): any {
+function ok<T extends ZodTypeAny>(schema: T, input: unknown): z.output<T> {
   const r = schema.safeParse(input)
   assert.equal(r.success, true, `Expected success but got failure for: ${JSON.stringify(input)}`)
-  return r.data
+  return (r as { success: true; data: z.output<T> }).data
 }
 
 /** Assert a Zod parse fails; optionally check the error message contains a substring. */
 function fail(schema: ZodTypeAny, input: unknown, expectedMessage?: string) {
   const r = schema.safeParse(input)
   assert.equal(r.success, false, `Expected failure but got success for: ${JSON.stringify(input)}`)
-  if (expectedMessage) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const messages: string[] = (r as any).error?.errors?.map((e: { message: string }) => e.message) ?? []
+  if (expectedMessage && !r.success) {
+    const messages: string[] = r.error.errors.map((e: { message: string }) => e.message)
     const matched = messages.some((m) => m.toLowerCase().includes(expectedMessage.toLowerCase()))
     assert.ok(matched, `Expected error containing "${expectedMessage}" but got: [${messages.join(', ')}]`)
   }

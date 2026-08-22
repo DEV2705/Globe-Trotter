@@ -125,6 +125,7 @@ export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--ink)]">Cover photo (optional)</label>
         <div className="flex items-center gap-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           {coverUrl && <img src={coverUrl} alt="" className="h-14 w-20 rounded-md object-cover" />}
           <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
             <Camera className="size-4" /> Upload
