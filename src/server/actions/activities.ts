@@ -113,7 +113,7 @@ export const reorderActivities = guard(async (input: unknown): Promise<ActionRes
   const session = await requireUser()
   const parsed = reorderActivitiesSchema.safeParse(input)
   if (!parsed.success) return fromZod(parsed.error)
-  const { stopId, order } = parsed.data
+  const { stopId, dayIndex, order } = parsed.data
 
   const stop = await db.stop.findUnique({
     where: { id: stopId },
@@ -122,20 +122,33 @@ export const reorderActivities = guard(async (input: unknown): Promise<ActionRes
   if (!stop) notFound()
   assertStopOwner(stop, session.id)
 
+  // Scope each write to the stop (and day) being reordered so ids from another
+  // stop — or another user's trip — no-op instead of being renumbered.
   await db.$transaction(
-    order.map((itemId, index) => db.tripActivity.update({ where: { id: itemId }, data: { order: index } }))
+    order.map((itemId, index) =>
+      db.tripActivity.updateMany({
+        where: { id: itemId, stopId, dayIndex },
+        data: { order: index },
+      })
+    )
   )
 
-  revalidatePath(`/trips/${stop.tripId}/build`)
+  revalidateTrip(stop.tripId)
   return ok()
 })
 
 export const moveActivityToDay = guard(
   async (itemId: string, dayIndex: number): Promise<ActionResult<undefined>> => {
     const session = await requireUser()
+    if (!Number.isInteger(dayIndex) || dayIndex < 0) return err('That is not a valid day.')
+
     const item = await db.tripActivity.findUnique({
       where: { id: itemId },
-      include: { stop: { include: { trip: { select: { userId: true, startDate: true } } } } },
+      include: {
+        stop: {
+          include: { trip: { select: { userId: true, startDate: true } }, city: { select: { name: true } } },
+        },
+      },
     })
     if (!item) notFound()
     assertTripActivityOwner(item, session.id)
@@ -143,16 +156,22 @@ export const moveActivityToDay = guard(
     const tripStart = utcDay(item.stop.trip.startDate)
     const startDayIndex = dayIndexFor(tripStart, item.stop.startDate)
     const endDayIndex = dayIndexFor(tripStart, item.stop.endDate)
-    const clampedDay = Math.min(Math.max(dayIndex, startDayIndex), endDayIndex)
+    // Reject rather than clamp: silently snapping the day back reported success while
+    // discarding the move, so the UI showed it until the next reload.
+    if (dayIndex < startDayIndex || dayIndex > endDayIndex) {
+      return err(
+        `This activity belongs to your ${item.stop.city.name} stop (Days ${startDayIndex + 1}–${endDayIndex + 1}).`
+      )
+    }
 
     const maxOrder = await db.tripActivity.aggregate({
-      where: { stopId: item.stopId, dayIndex: clampedDay },
+      where: { stopId: item.stopId, dayIndex },
       _max: { order: true },
     })
 
     await db.tripActivity.update({
       where: { id: itemId },
-      data: { dayIndex: clampedDay, order: (maxOrder._max.order ?? -1) + 1 },
+      data: { dayIndex, order: (maxOrder._max.order ?? -1) + 1 },
     })
 
     revalidateTrip(item.stop.tripId)

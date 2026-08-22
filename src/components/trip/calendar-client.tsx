@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   DndContext,
@@ -10,7 +11,9 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragStartEvent,
 } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
 import { cn } from '@/lib/utils'
 import { formatDay } from '@/lib/dates'
 import { formatMoney } from '@/lib/budget'
@@ -31,14 +34,22 @@ const TYPE_COLORS: Record<string, string> = {
 }
 
 function ActivityChip({ item }: { item: TripActivityDTO }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id })
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: item.id })
   return (
     <button
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      className={cn('mb-1 flex w-full items-center gap-1.5 truncate rounded px-1.5 py-1 text-left text-[11px] text-white', isDragging && 'opacity-50')}
-      style={{ background: TYPE_COLORS[item.activity.type] ?? '#6B7280' }}
+      className={cn(
+        'mb-1 flex w-full touch-none items-center gap-1.5 truncate rounded px-1.5 py-1 text-left text-[11px] text-white',
+        isDragging && 'opacity-50'
+      )}
+      style={{
+        background: TYPE_COLORS[item.activity.type] ?? '#6B7280',
+        transform: CSS.Translate.toString(transform),
+        zIndex: isDragging ? 20 : undefined,
+        position: isDragging ? 'relative' : undefined,
+      }}
       title={item.activity.name}
     >
       <span className="truncate">{item.activity.name}</span>
@@ -52,6 +63,7 @@ function DayCell({
   items,
   isToday,
   overCap,
+  disabled,
   onOpen,
 }: {
   dayIndex: number
@@ -59,9 +71,10 @@ function DayCell({
   items: TripActivityDTO[]
   isToday: boolean
   overCap: boolean
+  disabled: boolean
   onOpen: () => void
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `day-${dayIndex}` })
+  const { setNodeRef, isOver } = useDroppable({ id: `day-${dayIndex}`, disabled })
   return (
     <div
       ref={setNodeRef}
@@ -69,7 +82,8 @@ function DayCell({
       className={cn(
         'min-h-24 cursor-pointer rounded-md border p-1.5',
         isOver ? 'border-[var(--stamp)] bg-[var(--stamp-50)]' : 'border-[var(--rule)]',
-        overCap && 'border-[var(--transit)]'
+        overCap && 'border-[var(--transit)]',
+        disabled && 'opacity-40'
       )}
     >
       <div className="mb-1 flex items-center justify-between">
@@ -90,20 +104,55 @@ export function CalendarClient({ trip, budget }: { trip: TripFullDTO; budget: Bu
     trip.stops.flatMap((s) => s.items.map((i) => ({ ...i, stop: s })))
   )
   const [openDay, setOpenDay] = useState<number | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }))
   const todayStr = new Date().toISOString().slice(0, 10)
+  const router = useRouter()
+  const [, startTransition] = useTransition()
+  // A drag that ends inside its origin cell still fires that cell's onClick, which
+  // popped the day Sheet open for no reason.
+  const justDraggedRef = useRef(false)
+
+  // Server data changes after revalidateTrip — without this the seeded state wins
+  // and a persisted move looks like it was reverted.
+  useEffect(() => {
+    setItems(trip.stops.flatMap((s) => s.items.map((i) => ({ ...i, stop: s }))))
+  }, [trip])
+
+  const activeItem = activeItemId ? items.find((i) => i.id === activeItemId) ?? null : null
+
+  function handleDragStart(event: DragStartEvent) {
+    justDraggedRef.current = true
+    setActiveItemId(String(event.active.id))
+  }
 
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event
+    setActiveItemId(null)
+    // Released after the click event would have been queued; clear on the next tick.
+    setTimeout(() => {
+      justDraggedRef.current = false
+    }, 0)
     if (!over) return
     const targetDay = Number(String(over.id).replace('day-', ''))
     const item = items.find((i) => i.id === active.id)
     if (!item || item.dayIndex === targetDay) return
 
+    const previous = items
     setItems((prev) => prev.map((i) => (i.id === item.id ? { ...i, dayIndex: targetDay } : i)))
     moveActivityToDay(item.id, targetDay).then((r) => {
-      if (!r.ok) toast.error(r.error)
+      if (!r.ok) {
+        setItems(previous)
+        toast.error(r.error)
+        return
+      }
+      startTransition(() => router.refresh())
     })
+  }
+
+  function openDayCell(dayIndex: number) {
+    if (justDraggedRef.current) return
+    setOpenDay(dayIndex)
   }
 
   const weeks: number[][] = []
@@ -117,7 +166,7 @@ export function CalendarClient({ trip, budget }: { trip: TripFullDTO; budget: Bu
     <div>
       {/* Month-grid view (sm and up) */}
       <div className="hidden sm:block">
-        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
           <div className="flex flex-col gap-2">
             {weeks.map((week, wi) => (
               <div key={wi} className="grid grid-cols-7 gap-2">
@@ -129,7 +178,11 @@ export function CalendarClient({ trip, budget }: { trip: TripFullDTO; budget: Bu
                     items={dayItems(dayIndex)}
                     isToday={trip.dayDates[dayIndex] === todayStr}
                     overCap={budget.byDay[dayIndex]?.overCap ?? false}
-                    onOpen={() => setOpenDay(dayIndex)}
+                    disabled={
+                      activeItem !== null &&
+                      (dayIndex < activeItem.stop.startDayIndex || dayIndex > activeItem.stop.endDayIndex)
+                    }
+                    onOpen={() => openDayCell(dayIndex)}
                   />
                 ))}
               </div>
