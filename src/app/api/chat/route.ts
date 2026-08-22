@@ -6,6 +6,11 @@ import { checkRateLimit } from '@/server/ai/rate-limit'
 import { streamChatReply, type ChatTurn } from '@/server/ai/chat'
 import { chatRequestSchema } from '@/server/ai/schemas'
 
+// Prisma needs the Node runtime; the edge runtime cannot load its query engine.
+export const runtime = 'nodejs'
+// A streamed answer outlives the 10s default. 30s stays inside the Hobby limit.
+export const maxDuration = 30
+
 /**
  * A Route Handler rather than a Server Action: actions cannot stream a response
  * token by token, and the streaming is the point.
