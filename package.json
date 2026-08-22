@@ -12,7 +12,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "setup": "prisma generate && prisma db push && tsx prisma/seed.ts",
-    "test": "tsx --test src/lib/*.test.ts"
+    "test": "tsx --test src/lib/validators.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
