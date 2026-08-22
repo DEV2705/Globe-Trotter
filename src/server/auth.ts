@@ -103,6 +103,14 @@ export async function getSession(): Promise<Session | null> {
   return session
 }
 
+/**
+ * Where a signed-in user belongs after landing on `/`. Middleware runs at the edge and
+ * cannot read `isAdmin` from Postgres, so it bounces through `/` and this decides.
+ */
+export function landingPathFor(user: { isAdmin: boolean }): string {
+  return user.isAdmin ? '/admin' : '/dashboard'
+}
+
 export async function requireUser(): Promise<Session> {
   const session = await getSession()
   if (!session) redirect('/login')
