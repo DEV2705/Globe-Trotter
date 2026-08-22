@@ -135,6 +135,8 @@ export interface TripCardDTO {
 export interface TripOption {
   id: string
   name: string
+  startDate: string
+  endDate: string
   stops: { id: string; cityName: string; startDayIndex: number; endDayIndex: number }[]
 }
 

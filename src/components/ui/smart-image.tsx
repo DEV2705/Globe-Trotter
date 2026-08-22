@@ -13,9 +13,10 @@ const GRADIENTS = [
   'linear-gradient(135deg, #3E7C6A, #DCE8E4)',
 ]
 
-export interface SmartImageProps extends Omit<ImageProps, 'onError' | 'src'> {
+export interface SmartImageProps extends Omit<ImageProps, 'onError' | 'src' | 'alt'> {
   src?: string | null
   caption: string
+  alt?: string
 }
 
 /** A dead Unsplash URL is a normal event, not an exception — the fallback must look composed. */
