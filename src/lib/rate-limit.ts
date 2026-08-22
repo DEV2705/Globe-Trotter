@@ -8,8 +8,10 @@ interface RateLimitRecord {
 // In-memory sliding-window bucket store for rate limiting
 const rateLimitStore = new Map<string, RateLimitRecord>()
 
-// Periodically clean up expired entries to prevent memory leaks
-setInterval(() => {
+// Periodically clean up expired entries to prevent memory leaks.
+// unref() is load-bearing: without it this timer keeps the event loop alive, so
+// any process that imports this module never exits on its own.
+const sweeper = setInterval(() => {
   const now = Date.now()
   for (const [key, record] of rateLimitStore.entries()) {
     if (now > record.resetTime) {
@@ -17,6 +19,7 @@ setInterval(() => {
     }
   }
 }, 60_000)
+sweeper.unref?.()
 
 export async function getClientIp(): Promise<string> {
   const head = await headers()

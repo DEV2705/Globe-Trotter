@@ -34,18 +34,22 @@ function safeInternalPath(next: string | undefined): string | null {
 }
 
 export const register = guard(async (input: unknown): Promise<ActionResult<undefined>> => {
-  const ip = await getClientIp()
-  const rateCheck = checkRateLimit('register', ip, 3, 300_000) // 3 registrations per 5 minutes
-  if (!rateCheck.success) {
-    return err('Too many registration attempts. Please try again later.')
-  }
-
+  // Validate before metering. Counting rejected input means a mistyped password
+  // or a mismatched confirmation burns the caller's quota, which locked people
+  // out of signing up entirely after a few honest typos.
   const parsed = registerSchema.safeParse(input)
   if (!parsed.success) return fromZod(parsed.error)
   const data = parsed.data
 
   const photoError = assertPhotoSize(data.photoUrl)
   if (photoError) return err(photoError, { photoUrl: photoError })
+
+  const ip = await getClientIp()
+  const rateCheck = checkRateLimit('register', ip, 10, 900_000) // 10 per 15 minutes
+  if (!rateCheck.success) {
+    const minutes = Math.max(1, Math.ceil(rateCheck.resetMs / 60_000))
+    return err(`Too many sign-up attempts. Please try again in ${minutes} minute${minutes === 1 ? '' : 's'}.`)
+  }
 
   const existing = await db.user.findUnique({ where: { email: data.email }, select: { id: true } })
   if (existing) {
@@ -77,15 +81,17 @@ export const register = guard(async (input: unknown): Promise<ActionResult<undef
 
 export const login = guard(
   async (input: unknown, next?: string): Promise<ActionResult<undefined>> => {
-    const ip = await getClientIp()
-    const rateCheck = checkRateLimit('login', ip, 5, 60_000) // 5 attempts per minute
-    if (!rateCheck.success) {
-      return err('Too many failed login attempts. Please try again in 1 minute.')
-    }
-
     const parsed = loginSchema.safeParse(input)
     if (!parsed.success) return fromZod(parsed.error)
     const { email, password } = parsed.data
+
+    // Metered per email rather than per IP: several people behind one address
+    // (a venue, a proxy, localhost) must not lock each other out.
+    const ip = await getClientIp()
+    const rateCheck = checkRateLimit('login', `${ip}:${email}`, 10, 60_000)
+    if (!rateCheck.success) {
+      return err('Too many failed login attempts. Please try again in a minute.')
+    }
 
     const user = await db.user.findUnique({
       where: { email },

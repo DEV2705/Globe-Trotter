@@ -11,6 +11,44 @@ export const runtime = 'nodejs'
 // A streamed answer outlives the 10s default. 30s stays inside the Hobby limit.
 export const maxDuration = 30
 
+// Enough to restore a conversation on reopen without shipping a huge payload.
+const TRANSCRIPT_LIMIT = 50
+
+/**
+ * Restores the visible transcript. The panel is unmounted whenever it is closed,
+ * so without this the traveller sees an empty thread while the model still
+ * remembers the conversation — the reply reads as a non-sequitur.
+ */
+export async function GET() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
+
+  const rows = await db.chatMessage.findMany({
+    where: { userId: session.id },
+    orderBy: { createdAt: 'desc' },
+    take: TRANSCRIPT_LIMIT,
+    select: { role: true, content: true },
+  })
+
+  return NextResponse.json(
+    {
+      turns: rows
+        .reverse()
+        .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content })),
+    },
+    { headers: { 'Cache-Control': 'no-store' } }
+  )
+}
+
+/** Clears this traveller's transcript. Scoped to their own rows. */
+export async function DELETE() {
+  const session = await getSession()
+  if (!session) return NextResponse.json({ error: 'Not signed in.' }, { status: 401 })
+
+  await db.chatMessage.deleteMany({ where: { userId: session.id } })
+  return NextResponse.json({ ok: true })
+}
+
 /**
  * A Route Handler rather than a Server Action: actions cannot stream a response
  * token by token, and the streaming is the point.
@@ -52,18 +90,20 @@ export async function POST(request: NextRequest) {
     .reverse()
     .map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: m.content }))
 
-  await db.chatMessage.create({
-    data: { userId: session.id, tripId: tripId ?? null, role: 'user', content: message },
-  })
-
   let stream: ReadableStream<Uint8Array>
   let full: Promise<string>
   try {
     ;({ stream, full } = await streamChatReply(session.id, history, message, tripId))
   } catch (error) {
+    // Persisted only once the request is away, so a failed call does not leave a
+    // question in the transcript that nothing ever answers.
     console.error(error)
     return NextResponse.json({ error: 'The assistant is unavailable right now.' }, { status: 502 })
   }
+
+  await db.chatMessage.create({
+    data: { userId: session.id, tripId: tripId ?? null, role: 'user', content: message },
+  })
 
   // Persist the reply once the stream finishes, without blocking the response.
   void full
