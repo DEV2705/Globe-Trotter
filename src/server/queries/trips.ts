@@ -113,6 +113,7 @@ export async function getTripOptions(userId: string): Promise<TripOption[]> {
       id: true,
       name: true,
       startDate: true,
+      endDate: true,
       stops: {
         orderBy: { order: 'asc' },
         select: { id: true, startDate: true, endDate: true, city: { select: { name: true } } },
@@ -125,6 +126,8 @@ export async function getTripOptions(userId: string): Promise<TripOption[]> {
     return {
       id: trip.id,
       name: trip.name,
+      startDate: toDateInput(start),
+      endDate: toDateInput(utcDay(trip.endDate)),
       stops: trip.stops.map((s) => ({
         id: s.id,
         cityName: s.city.name,
