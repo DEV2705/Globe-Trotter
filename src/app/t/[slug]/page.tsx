@@ -6,6 +6,7 @@ import { formatDay, formatRange } from '@/lib/dates'
 import { formatMoney } from '@/lib/budget'
 import { CopyTripButton } from '@/components/trip/copy-trip-button'
 import { BudgetPie } from '@/components/charts/budget-pie'
+import { TripRouteMap } from '@/components/trip/trip-route-map'
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params
@@ -50,6 +51,10 @@ export default async function PublicTripPage({ params }: { params: Promise<{ slu
         </div>
 
         <div className="rounded-b-xl border border-t-0 border-[var(--rule)] bg-[var(--surface)] p-6">
+          <div className="mb-6">
+            <TripRouteMap stops={trip.stops} currency={trip.currency} dayDates={trip.dayDates} height={300} />
+          </div>
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-[1fr_260px]">
             <div className="flex flex-col gap-3">
               {trip.dayDates.map((date, dayIndex) => {

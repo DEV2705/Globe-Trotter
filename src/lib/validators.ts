@@ -155,6 +155,12 @@ export const reorderActivitiesSchema = z.object({
 })
 export type ReorderActivitiesInput = z.infer<typeof reorderActivitiesSchema>
 
+/** One traveller's share of an expense. */
+export const expenseSplitSchema = z.object({
+  memberId: z.string().min(1),
+  amount: z.preprocess((v) => Number(v), z.number().min(0)),
+})
+
 export const expenseSchema = z.object({
   tripId: z.string().min(1),
   stopId: z.preprocess(emptyToUndefined, z.string().optional()),
@@ -165,8 +171,20 @@ export const expenseSchema = z.object({
     (v) => (v === '' || v === null || v === undefined ? undefined : Number(v)),
     z.number().int().min(0).optional()
   ),
+  // Absent means the expense is budgeted but not shared — it stays out of the settlement.
+  paidById: z.preprocess(emptyToUndefined, z.string().optional()),
+  // Absent means "split equally between everyone".
+  splits: z.array(expenseSplitSchema).optional(),
 })
 export type ExpenseInput = z.infer<typeof expenseSchema>
+
+export const tripMemberSchema = z.object({
+  tripId: z.string().min(1),
+  name: z.string().trim().min(1, 'Name is required').max(80),
+  email: z.preprocess(emptyToUndefined, z.string().email('Enter a valid email').optional()),
+  avatarUrl: z.preprocess(emptyToUndefined, z.string().optional()),
+})
+export type TripMemberInput = z.infer<typeof tripMemberSchema>
 
 export const postSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(120),

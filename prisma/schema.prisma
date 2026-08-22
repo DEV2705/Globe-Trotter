@@ -1,12 +1,12 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   // Vercel's runtime is Amazon Linux, not the local dev machine. Without the
   // second target the deployed function cannot load a query engine at all.
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   // Pooled connection (pgbouncer) — serverless opens far more connections than
   // Postgres will accept directly.
   url       = env("DATABASE_URL")
@@ -86,6 +86,7 @@ model Trip {
   expenses    Expense[]
   posts       Post[]
   packingList PackingList?
+  members     TripMember[]
 
   @@index([userId, startDate])
   @@index([isPublic, viewCount])
@@ -157,16 +158,37 @@ model TripActivity {
 }
 
 model Expense {
-  id       String   @id @default(cuid())
+  id       String      @id @default(cuid())
   tripId   String
-  trip     Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  trip     Trip        @relation(fields: [tripId], references: [id], onDelete: Cascade)
   stopId   String?
   category Category
   label    String
-  amount   Decimal  @db.Decimal(10, 2)
+  amount   Decimal     @db.Decimal(10, 2)
   dayIndex Int?
+  // Who fronted the money. Null keeps the expense out of the settlement — it is still
+  // budgeted, just not owed between travellers.
+  paidById String?
+  paidBy   TripMember? @relation(fields: [paidById], references: [id], onDelete: SetNull)
+  // [{ memberId, amount }] — empty/absent means split equally across every member.
+  splits   Json?
 
   @@index([tripId, category])
+  @@index([paidById])
+}
+
+/// A traveller sharing a trip's costs. Not a User: most companions never sign up.
+model TripMember {
+  id        String    @id @default(cuid())
+  tripId    String
+  trip      Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  name      String
+  email     String?
+  avatarUrl String?
+  createdAt DateTime  @default(now())
+  expenses  Expense[]
+
+  @@index([tripId])
 }
 
 model Post {

@@ -16,6 +16,7 @@ import { BudgetPie } from '@/components/charts/budget-pie'
 import { BudgetByDayBar } from '@/components/charts/budget-by-day-bar'
 import { SharePanel } from '@/components/trip/share-panel'
 import { ExpenseManager } from '@/components/trip/expense-manager'
+import { TripRouteMap } from '@/components/trip/trip-route-map'
 import { PackingListPanel } from '@/components/trip/packing-list-panel'
 import { CalendarClock } from 'lucide-react'
 
@@ -42,6 +43,12 @@ export default async function TripViewPage({ params }: { params: Promise<{ id: s
 
       <div className="mb-6">
         <SharePanel tripId={trip.id} isPublic={trip.isPublic} shareSlug={trip.shareSlug} appUrl={appUrl} />
+      </div>
+
+      <div className="mb-6">
+        <Panel title="Route map" description="Every stop in order — switch to a day to zoom into its activities.">
+          <TripRouteMap stops={trip.stops} currency={trip.currency} dayDates={trip.dayDates} />
+        </Panel>
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
@@ -157,6 +164,7 @@ export default async function TripViewPage({ params }: { params: Promise<{ id: s
               currency={trip.currency}
               expenses={trip.expenses}
               stopOptions={stopsSorted.map((s) => ({ id: s.id, label: s.city.name }))}
+              members={trip.members}
             />
           </Panel>
           <PackingListPanel tripId={trip.id} items={packingItems} aiEnabled={isAiConfigured()} />

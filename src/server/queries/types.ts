@@ -84,6 +84,11 @@ export interface StopDTO {
   nights: number
 }
 
+export interface ExpenseSplitDTO {
+  memberId: string
+  amount: number
+}
+
 export interface ExpenseDTO {
   id: string
   tripId: string
@@ -92,6 +97,18 @@ export interface ExpenseDTO {
   label: string
   amount: number
   dayIndex: number | null
+  /** Null when nobody fronted it — the expense is budgeted but not shared. */
+  paidById: string | null
+  /** Empty means split equally across every member. */
+  splits: ExpenseSplitDTO[]
+}
+
+export interface TripMemberDTO {
+  id: string
+  tripId: string
+  name: string
+  email: string | null
+  avatarUrl: string | null
 }
 
 export interface TripFullDTO {
@@ -113,6 +130,7 @@ export interface TripFullDTO {
   dayDates: string[]
   stops: StopDTO[]
   expenses: ExpenseDTO[]
+  members: TripMemberDTO[]
 }
 
 export interface TripCardDTO {

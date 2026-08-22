@@ -10,7 +10,9 @@ import type {
   ActivityDTO,
   CityDTO,
   ExpenseDTO,
+  ExpenseSplitDTO,
   StopDTO,
+  TripMemberDTO,
   TripActivityDTO,
   TripFullDTO,
 } from './types'
@@ -122,6 +124,24 @@ type ExpenseRow = {
   label: string
   amount: Prisma.Decimal | number
   dayIndex: number | null
+  paidById?: string | null
+  splits?: Prisma.JsonValue
+}
+
+/**
+ * `splits` is a JSON column, so it can hold anything a past write left there. Parse
+ * defensively and drop malformed entries rather than letting them reach the settlement.
+ */
+function parseSplits(value: Prisma.JsonValue | undefined): ExpenseSplitDTO[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry) => {
+    if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) return []
+    const { memberId, amount } = entry as Record<string, unknown>
+    if (typeof memberId !== 'string' || typeof amount !== 'number' || !Number.isFinite(amount)) {
+      return []
+    }
+    return [{ memberId, amount }]
+  })
 }
 
 export function mapExpense(expense: ExpenseRow): ExpenseDTO {
@@ -133,6 +153,24 @@ export function mapExpense(expense: ExpenseRow): ExpenseDTO {
     label: expense.label,
     amount: toNumber(expense.amount),
     dayIndex: expense.dayIndex,
+    paidById: expense.paidById ?? null,
+    splits: parseSplits(expense.splits),
+  }
+}
+
+export function mapTripMember(member: {
+  id: string
+  tripId: string
+  name: string
+  email: string | null
+  avatarUrl: string | null
+}): TripMemberDTO {
+  return {
+    id: member.id,
+    tripId: member.tripId,
+    name: member.name,
+    email: member.email,
+    avatarUrl: member.avatarUrl,
   }
 }
 
@@ -184,6 +222,7 @@ type TripRow = {
   viewCount: number
   stops: StopRow[]
   expenses: ExpenseRow[]
+  members?: { id: string; tripId: string; name: string; email: string | null; avatarUrl: string | null }[]
 }
 
 export function mapTripFull(trip: TripRow): TripFullDTO {
@@ -211,5 +250,6 @@ export function mapTripFull(trip: TripRow): TripFullDTO {
       .sort((a, b) => a.order - b.order)
       .map((s) => mapStop(s, start)),
     expenses: trip.expenses.map(mapExpense),
+    members: (trip.members ?? []).map(mapTripMember),
   }
 }

@@ -147,6 +147,7 @@ const TRIP_FULL_INCLUDE = {
     },
   },
   expenses: true,
+  members: { orderBy: { createdAt: 'asc' as const } },
 }
 
 /** One query for the whole tree — Screens 5, 9 and 11 all render from this single shape. */
