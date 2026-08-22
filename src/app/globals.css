@@ -1,0 +1,204 @@
+@import 'tailwindcss';
+
+@theme {
+  /* ---- transit-ephemera tokens (GLOBETROTTER_MASTER_PLAN.md §5.1) ---- */
+  --color-ink: #14181F;
+  --color-paper: #FBFAF7;
+  --color-surface: #FFFFFF;
+  --color-rule: #E4E1DA;
+  --color-stamp: #1F4B3F;
+  --color-transit: #E0642B;
+  --color-muted: #6B7280;
+
+  --color-stamp-50: #F0F5F3;
+  --color-stamp-100: #DCE8E4;
+  --color-stamp-600: #1A4036;
+  --color-stamp-700: #14332B;
+
+  --color-transit-50: #FDF1EB;
+  --color-transit-100: #FADFD1;
+  --color-transit-700: #B74D1E;
+
+  /* fixed budget category colors — used identically everywhere (§5.1) */
+  --color-cat-transport: #1F4B3F;
+  --color-cat-stay: #3E7C6A;
+  --color-cat-activity: #E0642B;
+  --color-cat-meal: #C9A227;
+  --color-cat-other: #6B7280;
+
+  --font-display: 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-body: 'Inter', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+:root {
+  --ink: #14181F;
+  --paper: #FBFAF7;
+  --surface: #FFFFFF;
+  --rule: #E4E1DA;
+  --stamp: #1F4B3F;
+  --transit: #E0642B;
+  --muted: #6B7280;
+
+  --stamp-50: #F0F5F3;
+  --stamp-100: #DCE8E4;
+  --stamp-600: #1A4036;
+  --stamp-700: #14332B;
+
+  --transit-50: #FDF1EB;
+  --transit-100: #FADFD1;
+  --transit-700: #B74D1E;
+
+  --near-cap-ratio: 0.85;
+}
+
+* {
+  border-color: var(--rule);
+}
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+}
+
+body {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, .display {
+  font-family: var(--font-display);
+  font-weight: 600;
+}
+
+/* every number in the product is monospace with tabular figures (§5.2) */
+.num,
+time,
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- focus ring (§3.6) ---- */
+:focus-visible {
+  outline: 2px solid var(--stamp);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---- perforated left edge — StopCard and DayHeader ONLY (§5.3) ---- */
+.perf-edge {
+  position: relative;
+  padding-left: 1.25rem;
+}
+
+.perf-edge-strip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0.75rem;
+  background-image: radial-gradient(circle at 50%, var(--paper) 2.5px, transparent 2.6px);
+  background-size: 100% 14px;
+  background-repeat: repeat-y;
+  background-position: center;
+}
+
+.perf-edge-strip::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  right: -1px;
+  border-right: 1px dashed var(--rule);
+}
+
+/* ---- boarding-pass notch pair — share-card stub separator only ---- */
+.notch-y {
+  position: relative;
+}
+
+.notch-y::before,
+.notch-y::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  background: var(--paper);
+  border-radius: 50%;
+  transform: translateX(-50%);
+}
+
+.notch-y::before {
+  top: -8px;
+}
+
+.notch-y::after {
+  bottom: -8px;
+}
+
+/* ---- diagonal hatch overprint — completed trips only ---- */
+.hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--rule) 0,
+    var(--rule) 1px,
+    transparent 1px,
+    transparent 8px
+  );
+}
+
+/* ---- motion (§5.4) ---- */
+@keyframes rise-fade {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-rise {
+  animation: rise-fade 320ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--rule) 25%, var(--stamp-50) 50%, var(--rule) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .skeleton {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: #fff;
+  }
+}
