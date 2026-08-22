@@ -7,19 +7,36 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Camera, Check, Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { parseDateInput, tripLength } from '@/lib/dates'
 import { tripSchema, type TripInput } from '@/lib/validators'
 import { createTrip } from '@/server/actions/trips'
 import { Button } from '@/components/ui/button'
 import { Input, Textarea } from '@/components/ui/input'
 import { Field } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
+import { SmartImage } from '@/components/ui/smart-image'
 import type { CityOption } from '@/server/queries/catalog'
+
+/** Spend per cost-index point per day — a rough starting figure the traveller edits. */
+const PER_POINT_PER_DAY: Record<string, number> = { INR: 200, USD: 2.5, EUR: 2.3, GBP: 2 }
+const ROUND_TO: Record<string, number> = { INR: 500, USD: 10, EUR: 10, GBP: 10 }
+
+function suggestBudget(costIndex: number, currency: string, days: number): number | null {
+  const rate = PER_POINT_PER_DAY[currency]
+  if (!rate || days < 1) return null
+  const step = ROUND_TO[currency] ?? 10
+  return Math.max(step, Math.round((costIndex * rate * days) / step) * step)
+}
 
 export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [placeQuery, setPlaceQuery] = useState('')
   const [coverUrl, setCoverUrl] = useState<string | undefined>(undefined)
+  // A city-derived cover may be swapped when the traveller picks a different city; an
+  // uploaded one is theirs and must never be overwritten.
+  const [coverSource, setCoverSource] = useState<'none' | 'city' | 'upload'>('none')
+  const [budgetHint, setBudgetHint] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const {
@@ -51,9 +68,45 @@ export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
     reader.onload = () => {
       const url = reader.result as string
       setCoverUrl(url)
+      setCoverSource('upload')
       setValue('coverUrl', url)
     }
     reader.readAsDataURL(file)
+  }
+
+  /**
+   * Picking a place fills in the trip for you. Every field is filled only when it is still
+   * blank, so anything already typed survives; clicking the active tile clears the choice.
+   */
+  function selectCity(c: CityOption) {
+    if (selectedCityId === c.id) {
+      setValue('firstCityId', '')
+      return
+    }
+    setValue('firstCityId', c.id)
+
+    if (!watch('name')?.trim()) setValue('name', `Trip to ${c.name}`)
+    if (!watch('description')?.trim()) {
+      setValue('description', `Exploring ${c.name}, ${c.country} — ${c.region}.`)
+    }
+
+    if (coverSource !== 'upload' && c.imageUrl) {
+      setCoverUrl(c.imageUrl)
+      setCoverSource('city')
+      setValue('coverUrl', c.imageUrl)
+    }
+
+    const start = watch('startDate')
+    const end = watch('endDate')
+    const currency = watch('currency') || 'INR'
+    if (!watch('budgetCap') && start && end) {
+      const days = tripLength(parseDateInput(start), parseDateInput(end))
+      const suggested = suggestBudget(c.costIndex, currency, days)
+      if (suggested) {
+        setValue('budgetCap', suggested)
+        setBudgetHint(`Suggested from ${c.name}'s cost index — edit freely.`)
+      }
+    }
   }
 
   function onSubmit(data: TripInput) {
@@ -101,17 +154,25 @@ export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
               <button
                 key={c.id}
                 type="button"
-                onClick={() => setValue('firstCityId', c.id)}
+                onClick={() => selectCity(c)}
+                aria-pressed={active}
                 className={cn(
-                  'flex flex-col items-start gap-0.5 rounded-md border p-2.5 text-left text-xs',
+                  'overflow-hidden rounded-md border text-left text-xs transition-colors',
                   active ? 'border-[var(--stamp)] bg-[var(--stamp-50)]' : 'border-[var(--rule)] hover:bg-[var(--stamp-50)]'
                 )}
               >
-                <span className="flex w-full items-center justify-between font-medium text-[var(--ink)]">
-                  {c.name}
-                  {active && <Check className="size-3.5 text-[var(--stamp)]" />}
-                </span>
-                <span className="text-[var(--muted)]">{c.country}</span>
+                <div className="relative h-20 w-full">
+                  <SmartImage src={c.imageUrl} caption={c.name} fill className="object-cover" sizes="180px" />
+                  {active && (
+                    <span className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-white/90 shadow-sm">
+                      <Check className="size-3.5 text-[var(--stamp)]" />
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-0.5 p-2">
+                  <span className="truncate font-medium text-[var(--ink)]">{c.name}</span>
+                  <span className="truncate text-[var(--muted)]">{c.country}</span>
+                </div>
               </button>
             )
           })}
@@ -125,7 +186,20 @@ export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--ink)]">Cover photo (optional)</label>
         <div className="flex items-center gap-3">
-          {coverUrl && <img src={coverUrl} alt="" className="h-14 w-20 rounded-md object-cover" />}
+          {coverUrl && (
+            <div className="relative h-14 w-20 overflow-hidden rounded-md">
+              {/* key: SmartImage latches its failed state on mount, so a new source needs a
+                  fresh instance — otherwise one dead city URL would blank later covers. */}
+              <SmartImage
+                key={coverUrl}
+                src={coverUrl}
+                caption="Cover"
+                fill
+                className="object-cover"
+                sizes="80px"
+              />
+            </div>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
             <Camera className="size-4" /> Upload
           </Button>
@@ -134,7 +208,12 @@ export function CreateTripForm({ cityOptions }: { cityOptions: CityOption[] }) {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Budget cap (optional)" htmlFor="budgetCap" error={errors.budgetCap?.message}>
+        <Field
+          label="Budget cap (optional)"
+          htmlFor="budgetCap"
+          error={errors.budgetCap?.message}
+          hint={budgetHint ?? undefined}
+        >
           <Input id="budgetCap" type="number" min={0} step={100} {...register('budgetCap')} />
         </Field>
         <Field label="Currency" htmlFor="currency">

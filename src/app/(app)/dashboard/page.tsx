@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/empty-state'
 import { SearchFilterBar } from '@/components/shell/search-filter-bar'
-import { CityCard } from '@/components/trip/city-card'
+import { LiveCityRail, LiveCityRailSkeleton } from '@/components/trip/live-city-rail'
 import { TripCard } from '@/components/trip/trip-card'
 
 interface DashboardSearchParams {
@@ -105,11 +105,10 @@ export default async function DashboardPage({
         {cities.length === 0 ? (
           <EmptyState icon={Plane} title="No cities found" description="Try a different search or filter." />
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-2">
-            {cities.map((c) => (
-              <CityCard key={c.id} city={c} className="w-56 shrink-0" />
-            ))}
-          </div>
+          // keyed on the result set so a new search re-suspends instead of showing stale conditions
+          <Suspense key={cities.map((c) => c.id).join(',')} fallback={<LiveCityRailSkeleton count={Math.min(cities.length, 6)} />}>
+            <LiveCityRail cities={cities} />
+          </Suspense>
         )}
       </section>
 
