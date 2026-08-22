@@ -133,10 +133,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <div className="mb-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel title="Popular cities">
-          <TopBarChart data={stats.topCities} dataKey="stopCount" labelKey="name" />
+          <TopBarChart data={stats.topCities} dataKey="stopCount" labelKey="name" countLabel="stop" />
         </Panel>
         <Panel title="Popular Activities">
-          <TopBarChart data={stats.topActivities} dataKey="addCount" labelKey="name" />
+          <TopBarChart data={stats.topActivities} dataKey="addCount" labelKey="name" countLabel="add" />
         </Panel>
       </div>
 

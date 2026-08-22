@@ -21,11 +21,15 @@ export interface TopBarUser {
   firstName: string
   lastName: string
   photoUrl: string | null
+  isAdmin: boolean
 }
 
 export function TopBar({ user }: { user: TopBarUser }) {
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = React.useState(false)
+  const navItems = user.isAdmin ? [...NAV_ITEMS, { href: '/admin', label: 'Admin' }] : NAV_ITEMS
+  // Plain startsWith would light up /trips for /trips-anything.
+  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`)
 
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--rule)] bg-[var(--paper)]/95 backdrop-blur">
@@ -35,13 +39,13 @@ export function TopBar({ user }: { user: TopBarUser }) {
             GlobeTrotter
           </Link>
           <nav className="hidden items-center gap-6 md:flex">
-            {NAV_ITEMS.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
                   'text-sm font-medium text-[var(--muted)] transition-colors hover:text-[var(--ink)]',
-                  pathname.startsWith(item.href) && 'text-[var(--ink)]'
+                  isActive(item.href) && 'text-[var(--ink)]'
                 )}
               >
                 {item.label}
@@ -85,14 +89,14 @@ export function TopBar({ user }: { user: TopBarUser }) {
 
       {mobileOpen && (
         <nav className="flex flex-col gap-1 border-t border-[var(--rule)] px-4 py-3 md:hidden">
-          {NAV_ITEMS.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
               className={cn(
                 'rounded-md px-2 py-2 text-sm font-medium text-[var(--muted)]',
-                pathname.startsWith(item.href) && 'bg-[var(--stamp-50)] text-[var(--ink)]'
+                isActive(item.href) && 'bg-[var(--stamp-50)] text-[var(--ink)]'
               )}
             >
               {item.label}

@@ -10,6 +10,7 @@ import {
   setSessionCookie,
   clearSessionCookie,
   requireUser,
+  landingPathFor,
 } from '@/server/auth'
 import { loginSchema, profileSchema, registerSchema } from '@/lib/validators'
 import { ok, err, fromZod, guard, type ActionResult } from '@/lib/action-result'
@@ -25,9 +26,10 @@ function assertPhotoSize(photoUrl: string | undefined): string | null {
   return null
 }
 
-function safeInternalPath(next: string | undefined): string {
+/** Null when there is no usable `next` — the caller decides the landing path. */
+function safeInternalPath(next: string | undefined): string | null {
   if (next && next.startsWith('/') && !next.startsWith('//')) return next
-  return '/dashboard'
+  return null
 }
 
 export const register = guard(async (input: unknown): Promise<ActionResult<undefined>> => {
@@ -58,12 +60,12 @@ export const register = guard(async (input: unknown): Promise<ActionResult<undef
       bio: data.bio,
       photoUrl: data.photoUrl,
     },
-    select: { id: true },
+    select: { id: true, isAdmin: true },
   })
 
   const token = await signToken({ userId: user.id })
   await setSessionCookie(token)
-  redirect('/dashboard')
+  redirect(landingPathFor(user))
 })
 
 export const login = guard(
@@ -74,7 +76,7 @@ export const login = guard(
 
     const user = await db.user.findUnique({
       where: { email },
-      select: { id: true, password: true, isActive: true },
+      select: { id: true, password: true, isActive: true, isAdmin: true },
     })
     if (!user || !user.isActive) return err(GENERIC_LOGIN_ERROR)
 
@@ -83,7 +85,7 @@ export const login = guard(
 
     const token = await signToken({ userId: user.id })
     await setSessionCookie(token)
-    redirect(safeInternalPath(next))
+    redirect(safeInternalPath(next) ?? landingPathFor(user))
   }
 )
 
