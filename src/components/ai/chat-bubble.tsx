@@ -109,28 +109,38 @@ export function ChatBubble({ enabled }: { enabled: boolean }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        aria-label={open ? 'Close travel assistant' : 'Open travel assistant'}
-        aria-expanded={open}
-        className={cn(
-          'no-print fixed bottom-5 right-5 z-50 flex size-13 items-center justify-center rounded-full bg-[var(--stamp)] text-white shadow-lg transition-transform hover:scale-105 motion-reduce:transition-none motion-reduce:hover:scale-100',
-          'size-14'
-        )}
-      >
-        {open ? <X className="size-5" /> : <MessageCircle className="size-5" />}
-      </button>
+      {/* Hidden while the panel is open — the launcher would otherwise sit on top of it. */}
+      {!open && (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Open travel assistant"
+          aria-expanded={false}
+          className="no-print fixed bottom-5 left-5 z-50 flex size-14 items-center justify-center rounded-full bg-[var(--stamp)] text-white shadow-lg transition-transform hover:scale-105 motion-reduce:transition-none motion-reduce:hover:scale-100"
+        >
+          <MessageCircle className="size-5" />
+        </button>
+      )}
 
       {open && (
         <div
           role="dialog"
           aria-label="Travel assistant"
-          className="no-print fixed bottom-24 right-5 z-50 flex h-[30rem] w-[min(24rem,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--surface)] shadow-2xl"
+          // Dynamic viewport height, so the input stays above a mobile browser's
+          // retracting toolbar rather than being pushed off-screen.
+          className="no-print fixed bottom-5 left-5 z-50 flex h-[min(30rem,calc(100dvh-2.5rem))] w-[min(24rem,calc(100vw-2.5rem))] flex-col overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--surface)] shadow-2xl"
         >
           <header className="flex items-center gap-2 border-b border-[var(--rule)] px-4 py-3">
-            <Sparkles className="size-4 text-[var(--stamp)]" />
+            <Sparkles className="size-4 shrink-0 text-[var(--stamp)]" />
             <span className="display text-sm font-semibold text-[var(--ink)]">Travel assistant</span>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              aria-label="Close travel assistant"
+              className="ml-auto flex size-7 shrink-0 items-center justify-center rounded-md text-[var(--muted)] transition-colors hover:bg-[var(--paper)] hover:text-[var(--ink)]"
+            >
+              <X className="size-4" />
+            </button>
           </header>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
