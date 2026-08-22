@@ -4,6 +4,7 @@ import { getTripFull, budgetFromTrip } from '@/server/queries/trips'
 import { getPackingItems } from '@/server/queries/packing'
 import { isAiConfigured } from '@/server/ai/client'
 import { formatDay, formatRange } from '@/lib/dates'
+import { getAppUrl } from '@/lib/app-url'
 import { formatMoney } from '@/lib/budget'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/shell/page-header'
@@ -26,7 +27,7 @@ export default async function TripViewPage({ params }: { params: Promise<{ id: s
   assertTripOwner(trip, session.id)
 
   const budget = budgetFromTrip(trip)
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = getAppUrl()
   const packingItems = await getPackingItems(id)
 
   const stopsSorted = [...trip.stops].sort((a, b) => a.order - b.order)
