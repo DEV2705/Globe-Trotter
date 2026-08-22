@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Camera } from 'lucide-react'
+import { Camera, Eye, EyeOff } from 'lucide-react'
 import { registerSchema, type RegisterInput } from '@/lib/validators'
 import { register as registerAction } from '@/server/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -16,6 +16,8 @@ export function RegisterForm() {
   const [pending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const {
     register,
@@ -102,10 +104,42 @@ export function RegisterForm() {
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Password" htmlFor="password" error={errors.password?.message}>
-              <Input id="password" type="password" autoComplete="new-password" {...register('password')} />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  className="pr-10"
+                  {...register('password')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)]"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </Field>
             <Field label="Confirm Password" htmlFor="confirmPassword" error={errors.confirmPassword?.message}>
-              <Input id="confirmPassword" type="password" autoComplete="new-password" {...register('confirmPassword')} />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  autoComplete="new-password"
+                  className="pr-10"
+                  {...register('confirmPassword')}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)]"
+                  aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                >
+                  {showConfirmPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                </button>
+              </div>
             </Field>
           </div>
 

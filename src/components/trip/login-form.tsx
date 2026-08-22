@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Compass } from 'lucide-react'
+import { Compass, Eye, EyeOff } from 'lucide-react'
 import { loginSchema, type LoginInput } from '@/lib/validators'
 import { login } from '@/server/actions/auth'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import { Card, CardBody, CardHeader } from '@/components/ui/card'
 export function LoginForm({ next }: { next?: string }) {
   const [pending, startTransition] = useTransition()
   const [serverError, setServerError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const {
     register,
     handleSubmit,
@@ -44,7 +45,23 @@ export function LoginForm({ next }: { next?: string }) {
             <Input id="email" type="email" autoComplete="email" placeholder="you@example.com" {...register('email')} />
           </Field>
           <Field label="Password" htmlFor="password" error={errors.password?.message}>
-            <Input id="password" type="password" autoComplete="current-password" {...register('password')} />
+            <div className="relative">
+              <Input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                autoComplete="current-password"
+                className="pr-10"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--ink)]"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           </Field>
           {serverError && <p className="text-sm text-red-600">{serverError}</p>}
           <Button type="submit" loading={pending} className="mt-2 w-full">

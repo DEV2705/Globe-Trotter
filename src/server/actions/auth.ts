@@ -14,6 +14,7 @@ import {
 } from '@/server/auth'
 import { loginSchema, profileSchema, registerSchema } from '@/lib/validators'
 import { ok, err, fromZod, guard, type ActionResult } from '@/lib/action-result'
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit'
 
 // Login returns the same error text for an unknown email and a wrong password — never enumerate accounts.
 const GENERIC_LOGIN_ERROR = 'Incorrect email or password.'
@@ -33,6 +34,12 @@ function safeInternalPath(next: string | undefined): string | null {
 }
 
 export const register = guard(async (input: unknown): Promise<ActionResult<undefined>> => {
+  const ip = await getClientIp()
+  const rateCheck = checkRateLimit('register', ip, 3, 300_000) // 3 registrations per 5 minutes
+  if (!rateCheck.success) {
+    return err('Too many registration attempts. Please try again later.')
+  }
+
   const parsed = registerSchema.safeParse(input)
   if (!parsed.success) return fromZod(parsed.error)
   const data = parsed.data
@@ -70,6 +77,12 @@ export const register = guard(async (input: unknown): Promise<ActionResult<undef
 
 export const login = guard(
   async (input: unknown, next?: string): Promise<ActionResult<undefined>> => {
+    const ip = await getClientIp()
+    const rateCheck = checkRateLimit('login', ip, 5, 60_000) // 5 attempts per minute
+    if (!rateCheck.success) {
+      return err('Too many failed login attempts. Please try again in 1 minute.')
+    }
+
     const parsed = loginSchema.safeParse(input)
     if (!parsed.success) return fromZod(parsed.error)
     const { email, password } = parsed.data
