@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Plus } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -10,6 +10,10 @@ import { SmartImage } from '@/components/ui/smart-image'
 import { EmptyState } from '@/components/ui/empty-state'
 import { formatMoney, formatDuration } from '@/lib/budget'
 import { AddToTripDialog } from './add-to-trip-dialog'
+import { ExploreCityCard } from './explore-city-card'
+import { CityQuickPreviewDrawer } from './city-quick-preview-drawer'
+import { VibeFilterBar, type VibeFilter } from './vibe-filter-bar'
+import { VIBES, type ExploreCityInsights, type VibeKey } from '@/server/queries/explore-live'
 import { Search } from 'lucide-react'
 import type { ActivityCardDTO, CityDTO, TripOption } from '@/server/queries/types'
 
@@ -18,11 +22,14 @@ export function ExploreResults({
   cities,
   activities,
   tripOptions,
+  insights = [],
 }: {
   tab: 'cities' | 'activities'
   cities: CityDTO[]
   activities: ActivityCardDTO[]
   tripOptions: TripOption[]
+  /** Live conditions and estimates, aligned to `cities` by id. Empty until they stream in. */
+  insights?: ExploreCityInsights[]
 }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -31,6 +38,27 @@ export function ExploreResults({
   const [addTarget, setAddTarget] = useState<
     { kind: 'city'; cityId: string } | { kind: 'activity'; activityId: string; cityId: string } | null
   >(null)
+  const [vibe, setVibe] = useState<VibeFilter>('all')
+  const [previewCity, setPreviewCity] = useState<CityDTO | null>(null)
+
+  const insightsById = useMemo(
+    () => new Map(insights.map((i) => [i.cityId, i])),
+    [insights]
+  )
+
+  const vibeCounts = useMemo(() => {
+    const counts = Object.fromEntries(VIBES.map((v) => [v.key, 0])) as Record<VibeKey, number>
+    for (const city of cities) {
+      for (const key of insightsById.get(city.id)?.vibes ?? []) counts[key] += 1
+    }
+    return counts
+  }, [cities, insightsById])
+
+  // Filtering happens here rather than through the URL so a vibe switch is instant.
+  const visibleCities = useMemo(
+    () => (vibe === 'all' ? cities : cities.filter((c) => insightsById.get(c.id)?.vibes.includes(vibe))),
+    [cities, insightsById, vibe]
+  )
 
   function setTab(next: 'cities' | 'activities') {
     const params = new URLSearchParams(searchParams.toString())
@@ -51,25 +79,29 @@ export function ExploreResults({
         cities.length === 0 ? (
           <EmptyState icon={Search} title="No cities found" description="Try a different search or filter." />
         ) : (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {cities.map((c) => (
-              <div key={c.id} className="overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--surface)]">
-                <div className="relative h-32 w-full">
-                  <SmartImage src={c.imageUrl} caption={c.name} fill className="object-cover" sizes="300px" />
-                </div>
-                <div className="p-3">
-                  <h3 className="display text-sm text-[var(--ink)]">{c.name}</h3>
-                  <p className="text-xs text-[var(--muted)]">
-                    {c.country} · {c.region}
-                  </p>
-                  <p className="num mt-1 text-xs text-[var(--muted)]">Cost index {c.costIndex} · Popularity {c.popularity}</p>
-                  <Button size="sm" className="mt-2 w-full" onClick={() => setAddTarget({ kind: 'city', cityId: c.id })}>
-                    <Plus className="size-3.5" /> Add to Trip
-                  </Button>
-                </div>
+          <>
+            <VibeFilterBar value={vibe} onChange={setVibe} counts={vibeCounts} total={cities.length} />
+
+            {visibleCities.length === 0 ? (
+              <EmptyState
+                icon={Search}
+                title="Nothing matches that vibe"
+                description="Pick another vibe, or go back to all destinations."
+              />
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {visibleCities.map((c) => (
+                  <ExploreCityCard
+                    key={c.id}
+                    city={c}
+                    insights={insightsById.get(c.id)}
+                    onOpenPreview={() => setPreviewCity(c)}
+                    onAddToTrip={() => setAddTarget({ kind: 'city', cityId: c.id })}
+                  />
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )
       ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_360px]">
@@ -129,6 +161,14 @@ export function ExploreResults({
           </div>
         </div>
       )}
+
+      <CityQuickPreviewDrawer
+        city={previewCity}
+        insights={previewCity ? insightsById.get(previewCity.id) ?? null : null}
+        open={!!previewCity}
+        onOpenChange={(o) => !o && setPreviewCity(null)}
+        onAddToTrip={(cityId) => setAddTarget({ kind: 'city', cityId })}
+      />
 
       <AddToTripDialog open={!!addTarget} onOpenChange={(o) => !o && setAddTarget(null)} tripOptions={tripOptions} target={addTarget} />
     </div>

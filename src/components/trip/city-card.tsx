@@ -1,103 +1,29 @@
 'use client'
 
 import { useEffect, useState, useTransition } from 'react'
-import {
-  CalendarPlus,
-  Clock,
-  Cloud,
-  CloudDrizzle,
-  CloudFog,
-  CloudLightning,
-  CloudRain,
-  CloudSun,
-  Coins,
-  Heart,
-  Snowflake,
-  Sparkles,
-  Sun,
-  TrendingUp,
-  type LucideIcon,
-} from 'lucide-react'
+import { CalendarPlus, Clock, Coins, Heart, Sparkles, TrendingUp } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { SmartImage } from '@/components/ui/smart-image'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { Meter } from '@/components/ui/stat'
-import { Skeleton } from '@/components/ui/skeleton'
 import { toggleSavedCity } from '@/server/actions/auth'
 import { CityItineraryDialog } from './city-itinerary-dialog'
+import { LocalTimePill, WEATHER_ICONS, formatRate } from './live-bits'
 import type { CityDTO } from '@/server/queries/types'
 import type { CityLiveInfo, WeatherIconKey } from '@/server/queries/live-city-info'
-
-const WEATHER_ICONS: Record<WeatherIconKey, LucideIcon> = {
-  sun: Sun,
-  'cloud-sun': CloudSun,
-  cloud: Cloud,
-  'cloud-fog': CloudFog,
-  'cloud-drizzle': CloudDrizzle,
-  'cloud-rain': CloudRain,
-  snowflake: Snowflake,
-  'cloud-lightning': CloudLightning,
-}
-
-/**
- * "1 EUR ≈ ₹112" reads well; "1 IDR ≈ ₹0.01" does not, so a weak destination currency is
- * quoted the other way round — "₹1 ≈ 168 IDR".
- */
-function formatRate(currency: NonNullable<CityLiveInfo['currency']>): string {
-  const { code, baseSymbol, rate } = currency
-  const round = (n: number) => (n >= 100 ? Math.round(n).toLocaleString('en-IN') : n.toFixed(2))
-
-  if (rate < 0.5) return `${baseSymbol}1 ≈ ${round(1 / rate)} ${code}`
-  return `1 ${code} ≈ ${baseSymbol}${round(rate)}`
-}
-
-/**
- * Ticks in the destination's own zone. Rendered only after mount: the server and the browser
- * sit in different moments (and often different zones), so a first-paint clock would be a
- * guaranteed hydration mismatch.
- */
-function LocalTime({ timezone }: { timezone: string }) {
-  const [time, setTime] = useState<string | null>(null)
-
-  useEffect(() => {
-    function tick() {
-      try {
-        setTime(
-          new Intl.DateTimeFormat('en-GB', {
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-            timeZone: timezone,
-          }).format(new Date())
-        )
-      } catch {
-        // An unrecognised zone (the UTC±H fallback) is not worth a broken card.
-        setTime(null)
-      }
-    }
-    tick()
-    const id = setInterval(tick, 30_000)
-    return () => clearInterval(id)
-  }, [timezone])
-
-  return (
-    <span className="inline-flex items-center gap-1 text-xs text-[var(--muted)]">
-      <Clock className="size-3.5 shrink-0" />
-      {time ? (
-        <span className="num">{time} Local</span>
-      ) : (
-        <Skeleton className="h-3 w-16" />
-      )}
-    </span>
-  )
-}
 
 /** Fixed-height strip: local time and FX only, so every card in the rail stays the same size. */
 function LiveSection({ live }: { live: CityLiveInfo }) {
   return (
     <div className="mt-2 flex flex-col gap-1.5">
-      {live.timezone && <LocalTime timezone={live.timezone} />}
+      {live.timezone && (
+        <span className="inline-flex items-center gap-1 text-xs text-[var(--muted)]">
+          <Clock className="size-3.5 shrink-0" />
+          <LocalTimePill timezone={live.timezone} suffix=" Local" />
+        </span>
+      )}
 
       {live.currency && (
         <span className="inline-flex items-center gap-1 text-xs text-[var(--muted)]">
