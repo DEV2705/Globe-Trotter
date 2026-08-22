@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation'
 import { requireUser, assertTripOwner } from '@/server/auth'
 import { getTripFull, budgetFromTrip } from '@/server/queries/trips'
+import { getPackingItems } from '@/server/queries/packing'
+import { isAiConfigured } from '@/server/ai/client'
 import { formatDay, formatRange } from '@/lib/dates'
 import { formatMoney } from '@/lib/budget'
 import { cn } from '@/lib/utils'
@@ -13,6 +15,7 @@ import { BudgetPie } from '@/components/charts/budget-pie'
 import { BudgetByDayBar } from '@/components/charts/budget-by-day-bar'
 import { SharePanel } from '@/components/trip/share-panel'
 import { ExpenseManager } from '@/components/trip/expense-manager'
+import { PackingListPanel } from '@/components/trip/packing-list-panel'
 import { CalendarClock } from 'lucide-react'
 
 export default async function TripViewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -24,6 +27,7 @@ export default async function TripViewPage({ params }: { params: Promise<{ id: s
 
   const budget = budgetFromTrip(trip)
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const packingItems = await getPackingItems(id)
 
   const stopsSorted = [...trip.stops].sort((a, b) => a.order - b.order)
 
@@ -154,6 +158,7 @@ export default async function TripViewPage({ params }: { params: Promise<{ id: s
               stopOptions={stopsSorted.map((s) => ({ id: s.id, label: s.city.name }))}
             />
           </Panel>
+          <PackingListPanel tripId={trip.id} items={packingItems} aiEnabled={isAiConfigured()} />
         </div>
       </div>
     </div>
