@@ -5,6 +5,9 @@ import { getTripOptions } from '@/server/queries/trips'
 import { PageHeader } from '@/components/shell/page-header'
 import { SearchFilterBar } from '@/components/shell/search-filter-bar'
 import { ExploreResults } from '@/components/trip/explore-results'
+import { ExploreCityCardSkeleton } from '@/components/trip/explore-city-card'
+import { getExploreCitiesInsights } from '@/server/queries/explore-live'
+import type { ActivityCardDTO, CityDTO, TripOption } from '@/server/queries/types'
 
 interface ExploreSearchParams {
   tab?: string
@@ -107,7 +110,51 @@ export default async function ExplorePage({ searchParams }: { searchParams: Prom
         />
       </Suspense>
 
-      <ExploreResults tab={tab} cities={cities} activities={activities} tripOptions={tripOptions} />
+      {tab === 'cities' && cities.length > 0 ? (
+        <Suspense
+          key={cities.map((c) => c.id).join(',')}
+          fallback={<ExploreResultsSkeleton count={Math.min(cities.length, 6)} />}
+        >
+          <LiveExploreResults cities={cities} activities={activities} tripOptions={tripOptions} />
+        </Suspense>
+      ) : (
+        <ExploreResults tab={tab} cities={cities} activities={activities} tripOptions={tripOptions} />
+      )}
+    </div>
+  )
+}
+
+/** Streams the grid in once the weather/FX providers answer, so the search bar paints first. */
+async function LiveExploreResults({
+  cities,
+  activities,
+  tripOptions,
+}: {
+  cities: CityDTO[]
+  activities: ActivityCardDTO[]
+  tripOptions: TripOption[]
+}) {
+  const insights = await getExploreCitiesInsights(cities)
+  return (
+    <ExploreResults
+      tab="cities"
+      cities={cities}
+      activities={activities}
+      tripOptions={tripOptions}
+      insights={insights}
+    />
+  )
+}
+
+function ExploreResultsSkeleton({ count }: { count: number }) {
+  return (
+    <div>
+      <div className="skeleton mb-4 h-8 w-full max-w-xl rounded-full" />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {Array.from({ length: count }).map((_, i) => (
+          <ExploreCityCardSkeleton key={i} />
+        ))}
+      </div>
     </div>
   )
 }

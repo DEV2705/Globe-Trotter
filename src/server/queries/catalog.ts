@@ -169,11 +169,21 @@ export interface CityOption {
   country: string
   region: string
   costIndex: number
+  popularity: number
+  imageUrl: string | null
 }
 
 export async function getCityOptions(): Promise<CityOption[]> {
   return db.city.findMany({
-    select: { id: true, name: true, country: true, region: true, costIndex: true },
+    select: {
+      id: true,
+      name: true,
+      country: true,
+      region: true,
+      costIndex: true,
+      popularity: true,
+      imageUrl: true,
+    },
     orderBy: { name: 'asc' },
   })
 }
